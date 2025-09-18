@@ -49,7 +49,7 @@ const validateLogin = (req, res, next) => {
       message: "Validation error",
       details: error.details.map((detail) => ({
         field: detail.path[0],
-        message: detail.message,
+        message: detail.message.replace(/['"]/g, ""), // Remove quotes from error messages
       })),
     });
   }
