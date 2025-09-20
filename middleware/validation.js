@@ -61,10 +61,34 @@ const validateLogin = (req, res, next) => {
 const validateAdvanceRequest = (req, res, next) => {
   const schema = Joi.object({
     amount: Joi.number().positive().max(1000000).required(),
-    purpose: Joi.string().min(10).max(500).required().trim(),
-    description: Joi.string().max(1000).optional().trim(),
-    expectedReturnDate: Joi.date().greater("now").required(),
-    priority: Joi.string().valid("low", "medium", "high", "urgent").optional(),
+    purpose: Joi.string().min(5).max(500).required().trim(),
+    description: Joi.string().min(10).max(1000).required().trim(),
+    dateNeeded: Joi.date().greater('now').required(),
+    priority: Joi.string().valid('low', 'medium', 'high', 'urgent').default('medium')
+  });
+
+  const { error } = schema.validate(req.body);
+
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Validation error",
+      details: error.details.map((detail) => ({
+        field: detail.path[0],
+        message: detail.message,
+      })),
+    });
+  }
+
+  next();
+};
+
+// Cash advance retirement validation
+const validateRetirement = (req, res, next) => {
+  const schema = Joi.object({
+    retirementDate: Joi.date().required(),
+    totalExpenses: Joi.number().positive().max(1000000).required(),
+    expenseBreakdown: Joi.string().min(10).max(1000).required().trim()
   });
 
   const { error } = schema.validate(req.body);
@@ -139,6 +163,7 @@ module.exports = {
   validateRegister,
   validateLogin,
   validateAdvanceRequest,
+  validateRetirement,
   validatePasswordChange,
   validateProfileUpdate,
 };
