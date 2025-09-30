@@ -49,10 +49,20 @@ const cashAdvanceSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+    rejectedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     rejectedReason: {
       type: String,
       trim: true,
       maxlength: 500,
+    },
+    approvedAt: {
+      type: Date,
+    },
+    rejectedAt: {
+      type: Date,
     },
   },
   {
