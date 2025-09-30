@@ -7,7 +7,7 @@ const { authenticate, authorize } = require("../middleware/auth");
 const router = express.Router();
 
 // @route   GET /api/manager/dashboard
-// @desc    Get manager dashboard overview
+// @desc    Get manager dashboard overview with enhanced team member data
 // @access  Private (Manager)
 router.get(
   "/dashboard",
@@ -16,13 +16,6 @@ router.get(
   async (req, res) => {
     try {
       const manager = await User.findById(req.user.id);
-
-      // Get team members count
-      const teamMembersCount = await User.countDocuments({
-        department: manager.department,
-        role: "staff",
-        isActive: true,
-      });
 
       // Get team member IDs for filtering
       const teamMembers = await User.find({
@@ -58,7 +51,7 @@ router.get(
       // Calculate stats from aggregation results
       const stats = {
         pendingApprovals: pendingApprovalsCount,
-        teamMembers: teamMembersCount,
+        teamMembers: teamMemberIds.length,
         totalTeamRequests: teamStats.reduce((sum, stat) => sum + stat.count, 0),
         approvedRequests:
           teamStats.find((stat) => stat._id === "approved")?.count || 0,
@@ -85,21 +78,64 @@ router.get(
         .sort({ createdAt: -1 })
         .limit(5);
 
-      // Get team members for display
+      // Get team members with full details and stats
       const displayTeamMembers = await User.find({
         department: manager.department,
         role: "staff",
         isActive: true,
       })
-        .select("firstName lastName employeeId position")
+        .select("firstName lastName employeeId position email phone createdAt")
         .limit(6);
+
+      // Add stats to each team member
+      const teamMembersWithStats = await Promise.all(
+        displayTeamMembers.map(async (member) => {
+          const memberStats = await CashAdvance.aggregate([
+            { $match: { user: member._id } },
+            {
+              $group: {
+                _id: "$status",
+                count: { $sum: 1 },
+                totalAmount: { $sum: "$amount" },
+              },
+            },
+          ]);
+
+          const statusCounts = {
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+            retired: 0,
+            total: 0,
+            totalAmount: 0,
+          };
+
+          memberStats.forEach((stat) => {
+            statusCounts[stat._id] = stat.count;
+            statusCounts.total += stat.count;
+            statusCounts.totalAmount += stat.totalAmount || 0;
+          });
+
+          return {
+            _id: member._id,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            employeeId: member.employeeId,
+            position: member.position,
+            email: member.email,
+            phone: member.phone,
+            hireDate: member.createdAt, // Using createdAt as hireDate
+            stats: statusCounts,
+          };
+        })
+      );
 
       res.json({
         success: true,
         data: {
           stats,
           pendingApprovals,
-          teamMembers: displayTeamMembers,
+          teamMembers: teamMembersWithStats,
           recentTeamRequests,
         },
       });
